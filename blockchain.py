@@ -1,6 +1,6 @@
 # Initializing blockchain list
 genesis_block = {
-	'previous_block': '',
+	'previous_hash': '',
 	'index': 0,
 	'transactions': []
 }
@@ -12,6 +12,10 @@ open_transactions = []
 # Current user
 owner = 'Abhi'
 
+# Set of all participants
+participants = {'Abhi'}
+
+
 
 # def get_last_blockchain_value():
 # 	"""Returns the last value of the current blockchain"""
@@ -19,6 +23,11 @@ owner = 'Abhi'
 # 		return None
 # 	else:
 # 		return blockchain[-1]
+
+
+def hash_block(block):
+	"""Returns a hash of the block"""
+	return '-'.join([str(block[key]) for key in block])	# A basic hash function
 
 
 def add_transaction(amount, recipient, sender=owner):
@@ -35,6 +44,8 @@ def add_transaction(amount, recipient, sender=owner):
 		'amount': amount
 	}
 	open_transactions.append(transaction)
+	participants.add(sender)
+	participants.add(recipient)
 
 
 def mine_block():
@@ -43,9 +54,9 @@ def mine_block():
 	# Get the hash of last block
 	if len(open_transactions) > 0:
 		last_block = blockchain[-1]
-		hashed_block = '-'.join([str(last_block[key]) for key in last_block])	# A basic hash function
+		hashed_block = hash_block(last_block)
 		block = {
-			'previous_block': hashed_block,
+			'previous_hash': hashed_block,
 			'index': len(blockchain),
 			'transactions': open_transactions
 		}
@@ -67,14 +78,11 @@ def print_blockchain_elements():
 
 
 def verify_chain():
-	"""Verifies the integrity of the blockchain"""
-	is_valid = True
-	block_index = 0
-	for block in blockchain:
-		if block_index > 0 and block[0] != blockchain[block_index-1]:
-			is_valid = False
-		block_index += 1
-	return is_valid
+	"""Verifies the current blockchain and returns True if it is valid, False otherwise"""
+	for (index,block) in enumerate(blockchain):
+		if index > 0 and block['previous_hash'] != hash_block(blockchain[index-1]):
+			return False
+	return True
 
 
 def get_user_choice():
@@ -85,6 +93,7 @@ def get_user_choice():
 	print("1. Add New Transaction")
 	print("2. Mine Blockchain")
 	print("3. View Blockchain")
+	print("4. View Participants")
 	print("m. Manipulate Blockchain")
 	print("q. Quit")
 	return input('Enter your choice: ')
@@ -109,9 +118,16 @@ while take_user_input:
 	elif user_choice == '3':
 		print_blockchain_elements()
 
+	elif user_choice == '4':
+		print(participants)
+
 	elif user_choice == 'm':
 		if len(blockchain) > 0:
-			blockchain[0] = [2]
+			blockchain[0] = {
+				'previous_hash': '',
+				'index': 0,
+				'transactions': [{'sender': 'Amit', 'recipient': 'Abhi', 'amount':100.0}]
+			}
 
 	elif user_choice == 'q' or user_choice == '0':
 		take_user_input = False
@@ -119,9 +135,9 @@ while take_user_input:
 	else:
 		print('Invalid choice!')
 
-	# if not verify_chain():
-	# 	print('Invalid Blockchain!!')
-	# 	take_user_input = False
+	if not verify_chain():
+		print('Invalid Blockchain!!')
+		take_user_input = False
 
 
 # print("Blockchain: ", blockchain)
