@@ -128,6 +128,7 @@ while take_user_input:
 
 	elif user_choice == '2':
 		mine_block()
+		print("\nMy Current Balance: ", get_balance(owner))
 
 	elif user_choice == '3':
 		print_blockchain_elements()
