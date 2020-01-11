@@ -1,3 +1,5 @@
+import functools
+
 #Reward received for a successful mining of a block
 MINING_REWARD = 10
 
@@ -34,18 +36,28 @@ def hash_block(block):
 
 
 def get_balance(participant):
+	"""Calculate and return the balance for a participant. It also considers the sent coins in the pending open-transactions to avoid double speding.
+	Arguments:
+		:participant: The person for whome to calculate the balance
+	"""
+	# Fetch a list of all sent coin amounts for the given person (empty lists returned if the person was not the sender)
+	# This fetches sent amounts of transactions that were already mined (included in blockchain)
 	tx_sender = [[tx['amount'] for tx in block['transactions'] if tx['sender'] == participant] for block in blockchain]
+	# Fetch a list of all sent coin amounts for the given person (empty lists returned if the person was not the sender)
+	# This fetches sent amounts of open-transactions (to avoid double spending)
 	open_tx_sender = [tx['amount'] for tx in open_transactions if tx['sender'] == participant]
-	tx_sender.append(open_tx_sender)	# Add open transactions for sender (sent amount)
-	amount_sent = 0
-	for tx in tx_sender:
-		if len(tx) > 0:
-			amount_sent += tx[0]
+	tx_sender.append(open_tx_sender)	# Add open transaction amounts for sender (sent amount)
+	# Calculate total sent amount
+	amount_sent = functools.reduce(lambda tx_sum, tx_amt: tx_sum + (tx_amt[0] if len(tx_amt) > 0 else 0), tx_sender, 0)
+
+	# Fetch a list all received received coin amounts that were already mined in the blockchain
+	# Here we ignore open-transactions because the receipient has not yet actually received those coins yet
 	tx_recipient = [[tx['amount'] for tx in block['transactions'] if tx['recipient'] == participant] for block in blockchain]
-	amount_received = 0
-	for tx in tx_recipient:
-		if len(tx) > 0:
-			amount_received += tx[0]
+	amount_received = functools.reduce(lambda tx_sum, tx_amt: tx_sum + (tx_amt[0] if len(tx_amt) > 0 else 0), tx_recipient, 0)
+
+	# print(f"Total Amount sent={amount_sent}, received={amount_received}")
+
+	# Return the total balance of the person (i.e, total_received - total_spent)
 	return amount_received - amount_sent
 
 
@@ -139,7 +151,8 @@ def get_user_choice():
 	print("2. Mine Blockchain")
 	print("3. View Blockchain")
 	print("4. View Participants")
-	print("5. Verify Open Transactions")
+	print("5. View My Balance")
+	print("6. Verify Open Transactions")
 	print("m. Manipulate Blockchain")
 	print("q. Quit")
 	return input('Enter your choice: ')
@@ -172,6 +185,9 @@ while take_user_input:
 		print(participants)
 
 	elif user_choice == '5':
+		print(get_balance(owner))
+
+	elif user_choice == '6':
 		if verify_all_open_transactions():
 			print("\nAll open transactions are valid.")
 		else:
