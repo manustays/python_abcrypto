@@ -48,12 +48,12 @@ def get_balance(participant):
 	open_tx_sender = [tx['amount'] for tx in open_transactions if tx['sender'] == participant]
 	tx_sender.append(open_tx_sender)	# Add open transaction amounts for sender (sent amount)
 	# Calculate total sent amount
-	amount_sent = functools.reduce(lambda tx_sum, tx_amt: tx_sum + (tx_amt[0] if len(tx_amt) > 0 else 0), tx_sender, 0)
+	amount_sent = functools.reduce(lambda tx_sum, tx_amt: tx_sum + (sum(tx_amt) if len(tx_amt) > 0 else 0), tx_sender, 0)
 
 	# Fetch a list all received received coin amounts that were already mined in the blockchain
 	# Here we ignore open-transactions because the receipient has not yet actually received those coins yet
 	tx_recipient = [[tx['amount'] for tx in block['transactions'] if tx['recipient'] == participant] for block in blockchain]
-	amount_received = functools.reduce(lambda tx_sum, tx_amt: tx_sum + (tx_amt[0] if len(tx_amt) > 0 else 0), tx_recipient, 0)
+	amount_received = functools.reduce(lambda tx_sum, tx_amt: tx_sum + (sum(tx_amt) if len(tx_amt) > 0 else 0), tx_recipient, 0)
 
 	# print(f"Total Amount sent={amount_sent}, received={amount_received}")
 
@@ -69,7 +69,7 @@ def verify_transaction(transaction):
 
 def verify_all_open_transactions():
 	"""Verifies all open-transactions and returns True if all are valid, False otherwise"""
-	return all([verify_transaction(tf) for tx in open_transactions])
+	return all([verify_transaction(tx) for tx in open_transactions])
 
 
 def add_transaction(amount, recipient, sender=owner):
@@ -176,7 +176,7 @@ while take_user_input:
 
 	elif user_choice == '2':
 		mine_block()
-		print("\nBalance of {} is {:6.2f}".format(owner, get_balance(owner)))
+		print("\nBalance of {}: {:6.2f}".format(owner, get_balance(owner)))
 
 	elif user_choice == '3':
 		print_blockchain_elements()
