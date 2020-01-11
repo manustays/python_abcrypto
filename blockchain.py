@@ -1,4 +1,6 @@
 from functools import reduce
+import hashlib
+import json
 
 #Reward received for a successful mining of a block
 MINING_REWARD = 10
@@ -22,21 +24,13 @@ participants = {'Abhi'}
 
 
 
-# def get_last_blockchain_value():
-# 	"""Returns the last value of the current blockchain"""
-# 	if len(blockchain) < 1:
-# 		return None
-# 	else:
-# 		return blockchain[-1]
-
-
 def hash_block(block):
-	"""Returns the hash of the block as a string
+	"""Returns the SHA256 hash of the block as a string
 
 	Arguments:
 		:block: The block to hash
 	"""
-	return '-'.join([str(block[key]) for key in block])	# A basic hash function
+	return hashlib.sha256(json.dumps(block).encode()).hexdigest()
 
 
 def get_balance(participant):
