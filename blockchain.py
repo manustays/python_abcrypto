@@ -1,10 +1,13 @@
+#Reward received for a successful mining of a block
+MINING_REWARD = 10
+
 # Initializing blockchain list
-genesis_block = {
+GENESIS_BLOCK = {
 	'previous_hash': '',
 	'index': 0,
 	'transactions': []
 }
-blockchain = [genesis_block]
+blockchain = [GENESIS_BLOCK]
 
 # List of new transactions that are waiting to be processed (mined), i.e, included into the blockchain
 open_transactions = []
@@ -67,6 +70,15 @@ def mine_block():
 	global open_transactions
 	# Get the hash of last block
 	if len(open_transactions) > 0:
+		# Add mining reward...
+		reward_transaction = {
+			'sender': 'MINING',
+			'recipient': owner,
+			'amount': MINING_REWARD
+		}
+		open_transactions.append(reward_transaction)
+
+		# Mine transactions...
 		last_block = blockchain[-1]
 		hashed_block = hash_block(last_block)
 		block = {
