@@ -31,12 +31,17 @@ participants = {'Abhi'}
 
 
 def hash_block(block):
-	"""Returns a hash of the block"""
+	"""Returns the hash of the block as a string
+
+	Arguments:
+		:block: The block to hash
+	"""
 	return '-'.join([str(block[key]) for key in block])	# A basic hash function
 
 
 def get_balance(participant):
 	"""Calculate and return the balance for a participant. It also considers the sent coins in the pending open-transactions to avoid double speding.
+
 	Arguments:
 		:participant: The person for whome to calculate the balance
 	"""
@@ -62,7 +67,11 @@ def get_balance(participant):
 
 
 def verify_transaction(transaction):
-	"""Returns True if the Sender of the transaction has sufficient balance for the transaction"""
+	"""Returns True if the Sender of the transaction has sufficient balance for the transaction
+
+	Arguments:
+		:transaction: The transaction to verify
+	"""
 	sender_balance = get_balance(transaction['sender'])
 	return sender_balance >= transaction['amount']
 
