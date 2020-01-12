@@ -2,14 +2,18 @@ from functools import reduce
 import hashlib
 import json
 
-#Reward received for a successful mining of a block
+# Configure Reward received for a successful mining of a block
 MINING_REWARD = 10
 
-# Initializing blockchain list
+# Configure Proof-Of-Work Difficulty: Number of leading zeros required in the hash
+POW_LEADING_ZEROS = 2
+
+# Initializing blockchain list with Genesis (first) block
 GENESIS_BLOCK = {
-	'previous_hash': '',
+	'previous_hash': '',		# Not required as it is the Genesis (first) block
 	'index': 0,
-	'transactions': []
+	'transactions': [],
+	'proof': 0					# Dummy proof (not required)
 }
 blockchain = [GENESIS_BLOCK]
 
@@ -30,11 +34,99 @@ def hash_block(block):
 	Arguments:
 		:block: The block to hash
 	"""
+	# Convert string to UTF8 with encode()
+	# Return string representation of SHA256 with hexdigest()
 	return hashlib.sha256(json.dumps(block).encode()).hexdigest()
 
 
+def valid_proof(transaction, last_hash, proof):
+	"""Returns True, if the proof (nonce) is valid a proof-of-work,
+	i.e., if it satisfies the proof-of-work condition of generating
+	a hash with the pre-defined number of zeros.
+
+	Arguments:
+		:transaction: List of transactions in the block
+		:last_hash: Hash of last block stored in the current block
+		:proof: The Nounce number that is to be checked
+	"""
+	guess = (str(transaction) + str(last_hash) + str(proof)).encode()	# Combine and UTF8 encode
+	guess_hash = hashlib.sha256(guess).hexdigest()
+	print("GUESS HASH: ", guess_hash)
+	return guess_hash[:POW_LEADING_ZEROS] == ('0' * POW_LEADING_ZEROS)
+
+
+def proof_of_work():
+	"""Generate and return a proof-of-work (nounce) for the given block
+
+	Arguments:
+		:block: The block for which proof-of-work is to be generated
+	"""
+	last_block = blockchain[-1]
+	last_hash = hash_block(last_block)
+	proof = 0
+	while not valid_proof(open_transactions, last_hash, proof):
+		proof += 1
+	return proof
+
+
+def mine_block():
+	"""Mine a block of the blockchain by processing and including
+	all pending open-transactions into the blockchain"""
+	global open_transactions
+
+	# Mine a block if there are pending transactions in the open-transactions list
+	if len(open_transactions) > 0:
+		print ('Mining started...')
+		# Add mining reward...
+		reward_transaction = {
+			'sender': 'MINING',
+			'recipient': owner,
+			'amount': MINING_REWARD
+		}
+		copied_open_transactions = open_transactions[:]
+		copied_open_transactions.append(reward_transaction)
+		# Mine the new block:
+		last_block = blockchain[-1]				# Get the last block to generate hash
+		hashed_block = hash_block(last_block)	# Get hash of the last block
+		proof = proof_of_work()		# Generate proof of work
+		block = {								# Create the new block
+			'previous_hash': hashed_block,
+			'index': len(blockchain),
+			'transactions': copied_open_transactions,
+			'proof': proof
+		}
+		# Add the new block to the blockchain
+		blockchain.append(block)
+		# Clear open-transactions. BUG: TODO: New transactions may have been added by now
+		open_transactions = []
+		print(f"Mining done. Proof = {proof}")
+
+
+def verify_chain():
+	"""Verifies the current blockchain and returns True if it is valid, False otherwise"""
+	for (index,block) in enumerate(blockchain):
+		if index == 0:
+			# Ignore the Genesis block.
+			continue
+		if block['previous_hash'] != hash_block(blockchain[index-1]):
+			# Fail verification, if the previous-hash stored in the block does not match
+			# the actual hash of the previous block.
+			print(f"ERROR: The previous-hash in block {index} does not match the actual hash")
+			return False
+		if not valid_proof(block['transactions'][:-1], block['previous_hash'], block['proof']):
+			# Fail verification, if the proof-of-work is invalid,
+			# i.e, it does not generate the required hash from the stored proof.
+			# Ignore the last transaction in the transactions array, which is the mining reward
+			print(f"ERROR: The proof-of-work in block {index} is invalid")
+			return False
+	# Verify the blockchain, if it did not fail anywhere in the previous loop
+	return True
+
+
 def get_balance(participant):
-	"""Calculate and return the balance for a participant. It also considers the sent coins in the pending open-transactions to avoid double speding.
+	"""Calculate and return the balance for a participant.
+	It also considers the sent coins in the pending open-transactions
+	to avoid double speding.
 
 	Arguments:
 		:participant: The person for whome to calculate the balance
@@ -76,7 +168,8 @@ def verify_all_open_transactions():
 
 
 def add_transaction(amount, recipient, sender=owner):
-	"""Adds the transaction to the blockchain's open-transactions queue if verified for sufficient balance.
+	"""Adds the transaction to the blockchain's open-transactions queue
+	if verified for sufficient balance.
 	Returns True if the transaction was added successfully, False otherwise.
 
 	Arguments:
@@ -98,32 +191,6 @@ def add_transaction(amount, recipient, sender=owner):
 		return False
 
 
-def mine_block():
-	"""Mine a block of the blockchain by processing and including a new transaction into the blockchain"""
-	global open_transactions
-	# Get the hash of last block
-	if len(open_transactions) > 0:
-		# Add mining reward...
-		reward_transaction = {
-			'sender': 'MINING',
-			'recipient': owner,
-			'amount': MINING_REWARD
-		}
-		copied_open_transactions = open_transactions[:]
-		copied_open_transactions.append(reward_transaction)
-
-		# Mine transactions...
-		last_block = blockchain[-1]
-		hashed_block = hash_block(last_block)
-		block = {
-			'previous_hash': hashed_block,
-			'index': len(blockchain),
-			'transactions': copied_open_transactions
-		}
-		blockchain.append(block)
-		open_transactions = []
-
-
 def get_transaction_details():
 	"""Inputs the transaction details (recipient & amount) from the user and returns it"""
 	tx_recipient = input('Enter the recipient of the transaction: ')
@@ -135,14 +202,6 @@ def print_blockchain_elements():
 	"""Print all the blocks of the blockchain"""
 	for block in blockchain:
 		print("Block: ", block)
-
-
-def verify_chain():
-	"""Verifies the current blockchain and returns True if it is valid, False otherwise"""
-	for (index,block) in enumerate(blockchain):
-		if index > 0 and block['previous_hash'] != hash_block(blockchain[index-1]):
-			return False
-	return True
 
 
 def get_user_choice():
