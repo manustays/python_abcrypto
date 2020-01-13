@@ -1,7 +1,8 @@
 from functools import reduce
-import hashlib
-import json
 from collections import OrderedDict
+
+from hash_util import hash_block, hash_str_256
+
 
 # Configure Reward received for a successful mining of a block
 MINING_REWARD = 10
@@ -29,18 +30,6 @@ participants = {'Abhi'}
 
 
 
-def hash_block(block):
-	"""Returns the SHA256 hash of the block as a string
-
-	Arguments:
-		:block: The block to hash
-	"""
-	# Convert string to UTF8 with encode()
-	# Return string representation of SHA256 with hexdigest()
-	# The "sort_keys=True" ensures that order of data remains same during multiple hashing of same block
-	return hashlib.sha256(json.dumps(block, sort_keys=True).encode()).hexdigest()
-
-
 def valid_proof(transaction, last_hash, proof):
 	"""Returns True, if the proof (nonce) is valid a proof-of-work,
 	i.e., if it satisfies the proof-of-work condition of generating
@@ -52,7 +41,7 @@ def valid_proof(transaction, last_hash, proof):
 		:proof: The Nounce number that is to be checked
 	"""
 	guess = (str(transaction) + str(last_hash) + str(proof)).encode()	# Combine and UTF8 encode
-	guess_hash = hashlib.sha256(guess).hexdigest()
+	guess_hash = hash_str_256(guess)
 	print("GUESS HASH: ", guess_hash)
 	return guess_hash[:POW_LEADING_ZEROS] == ('0' * POW_LEADING_ZEROS)
 
