@@ -1,6 +1,7 @@
 from functools import reduce
 from collections import OrderedDict
-import json
+# import json
+import pickle
 
 from hash_util import hash_block, hash_str_256
 
@@ -11,16 +12,11 @@ MINING_REWARD = 10
 # Configure Proof-Of-Work Difficulty: Number of leading zeros required in the hash
 POW_LEADING_ZEROS = 2
 
-# Initializing blockchain list with Genesis (first) block
-GENESIS_BLOCK = {
-	'previous_hash': '',		# Not required as it is the Genesis (first) block
-	'index': 0,
-	'transactions': [],
-	'proof': 0					# Dummy proof (not required)
-}
-blockchain = [GENESIS_BLOCK]
+# The Blockchain: a list of blocks of processed transactions
+blockchain = []
 
-# List of new transactions that are waiting to be processed (mined), i.e, included into the blockchain
+# List of new unhandled transactions that are waiting to be processed (mined)
+# and included into the blockchain
 open_transactions = []
 
 # Current user
@@ -32,43 +28,74 @@ participants = {'Abhi'}
 
 
 def load_data():
-	"""Loads the blockchain and the open-transactions data from the file"""
-	with open('blockchain.txt', mode='r') as f:
-		file_content = f.readlines()
-		global blockchain
-		global open_transactions
+	"""Loads the blockchain and the open-transactions data from file"""
+	global blockchain
+	global open_transactions
 
-		blockchain = json.loads(file_content[0][:-1])	# Exclude '\n' at the end of the line
-		updated_blockchain = []
-		for block in blockchain:
-			updated_block = {
-				'previous_hash': block['previous_hash'],
-				'index': block['index'],
-				'transactions': [OrderedDict(
-			[('sender', tx['sender']), ('recipient', tx['recipient']), ('amount', tx['amount'])]) for tx in block['transactions']],
-				'proof': block['proof']
-			}
-			updated_blockchain.append(updated_block)
-		blockchain = updated_blockchain
+	try:
+		with open('blockchain_store.p', mode='rb') as f:
+			file_content = pickle.loads(f.read())
+			blockchain = file_content['blockchain']
+			open_transactions = file_content['open_transactions']
 
-		open_transactions = json.loads(file_content[1])
-		updated_open_transactions = []
-		for tx in open_transactions:
-			updated_transaction = OrderedDict(
-			[('sender', tx['sender']), ('recipient', tx['recipient']), ('amount', tx['amount'])])
-			updated_open_transactions.append(updated_transaction)
-		open_transactions = updated_open_transactions
+		## LOAD FROM TEXT FILE FOR EASIER DEBUGGING...
+		# with open('blockchain_store.txt', mode='r') as f:
+		# 	file_content = f.readlines()
+		# 	blockchain = json.loads(file_content[0][:-1])	# Exclude '\n' at the end of the line
+		# 	updated_blockchain = []
+		# 	for block in blockchain:
+		# 		updated_block = {
+		# 			'previous_hash': block['previous_hash'],
+		# 			'index': block['index'],
+		# 			'transactions': [OrderedDict(
+		# 		[('sender', tx['sender']), ('recipient', tx['recipient']), ('amount', tx['amount'])]) for tx in block['transactions']],
+		# 			'proof': block['proof']
+		# 		}
+		# 		updated_blockchain.append(updated_block)
+		# 	blockchain = updated_blockchain
+		# 	open_transactions = json.loads(file_content[1])
+		# 	updated_open_transactions = []
+		# 	for tx in open_transactions:
+		# 		updated_transaction = OrderedDict(
+		# 		[('sender', tx['sender']), ('recipient', tx['recipient']), ('amount', tx['amount'])])
+		# 		updated_open_transactions.append(updated_transaction)
+		# 	open_transactions = updated_open_transactions
+
+	except (IOError, IndexError):
+		print('Blockchain save file not found!')
+		# Initializing blockchain list with Genesis (first) block
+		GENESIS_BLOCK = {
+			'previous_hash': '',		# Not required as it is the Genesis (first) block
+			'index': 0,
+			'transactions': [],
+			'proof': 0					# Dummy proof (not required)
+		}
+		blockchain = [GENESIS_BLOCK]
+		# Initialize open-transactions
+		open_transactions = []
 
 
 load_data()		# Load Data as soon as the program starts
 
 
 def save_data():
-	"""Saves the blockchain and the open-transactions data into a file"""
-	with open('blockchain.txt', mode='w') as f:
-		f.write(json.dumps(blockchain))
-		f.write('\n')
-		f.write(json.dumps(open_transactions))
+	"""Saves the blockchain and the open-transactions data into file"""
+	try:
+		with open('blockchain_store.p', mode='wb') as f:
+			save_data = {
+				'blockchain': blockchain,
+				'open_transactions': open_transactions
+			}
+			f.write(pickle.dumps(save_data))
+
+		## STORE IN A TEXT FILE FOR EASIER DEBUGGING...
+		# with open('blockchain_store.txt', mode='w') as f:
+			# f.write(json.dumps(blockchain))
+			# f.write('\n')
+			# f.write(json.dumps(open_transactions))
+
+	except IOError:
+		print('Saving blockchain failed!')
 
 
 def valid_proof(transaction, last_hash, proof):
