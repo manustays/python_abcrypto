@@ -3,9 +3,10 @@ from collections import OrderedDict
 # import json
 import pickle
 
-from hash_util import hash_block, hash_str_256
+from hash_util import hash_block
 from block import Block
 from transaction import Transaction
+from verification import Verification
 
 
 # Configure Reward received for a successful mining of a block
@@ -101,22 +102,6 @@ def save_data():
 		print('Saving blockchain failed!')
 
 
-def valid_proof(transactions, last_hash, proof):
-	"""Returns True, if the proof (nonce) is valid a proof-of-work,
-	i.e., if it satisfies the proof-of-work condition of generating
-	a hash with the pre-defined number of zeros.
-
-	Arguments:
-		:transactions: List of transactions of the block for which proof is required
-		:last_hash: Hash of last block stored in the current block
-		:proof: The Nonce number that is to be checked
-	"""
-	guess = (str([tx.to_ordered_dict() for tx in transactions]) + str(last_hash) + str(proof)).encode()	# Combine and UTF8 encode
-	guess_hash = hash_str_256(guess)
-	print("GUESS HASH: ", guess_hash)
-	return guess_hash[:POW_LEADING_ZEROS] == ('0' * POW_LEADING_ZEROS)
-
-
 def proof_of_work():
 	"""Generate and return a proof-of-work (nonce) for the given block
 
@@ -126,7 +111,8 @@ def proof_of_work():
 	last_block = blockchain[-1]
 	last_hash = hash_block(last_block)
 	proof = 0
-	while not valid_proof(open_transactions, last_hash, proof):
+	verifier = Verification()
+	while not verifier.valid_proof(open_transactions, last_hash, proof, POW_LEADING_ZEROS):
 		proof += 1
 	return proof
 
@@ -159,26 +145,6 @@ def mine_block():
 		save_data()
 
 
-def verify_chain():
-	"""Verifies the current blockchain and returns True if it is valid, False otherwise"""
-	for (index,block) in enumerate(blockchain):
-		if index == 0:
-			# Ignore the Genesis block.
-			continue
-		if block.previous_hash != hash_block(blockchain[index-1]):
-			# Fail verification, if the previous-hash stored in the block does not match
-			# the actual hash of the previous block.
-			print(f"ERROR: The previous-hash in block {index} does not match the actual hash")
-			return False
-		if not valid_proof(block.transactions[:-1], block.previous_hash, block.proof):
-			# Fail verification, if the proof-of-work is invalid,
-			# i.e, it does not generate the required hash from the stored proof.
-			# Ignore the last transaction in the transactions array, which is the mining reward
-			print(f"ERROR: The proof-of-work in block {index} is invalid")
-			return False
-	# Verify the blockchain, if it did not fail anywhere in the previous loop
-	return True
-
 
 def get_balance(participant):
 	"""Calculate and return the balance for a participant.
@@ -209,21 +175,6 @@ def get_balance(participant):
 	return amount_received - amount_sent
 
 
-def verify_transaction(transaction):
-	"""Returns True if the Sender of the transaction has sufficient balance for the transaction
-
-	Arguments:
-		:transaction: The transaction to verify (object of class Transaction)
-	"""
-	sender_balance = get_balance(transaction.sender)
-	return sender_balance >= transaction.amount
-
-
-def verify_all_open_transactions():
-	"""Verifies all open-transactions and returns True if all are valid, False otherwise"""
-	return all([verify_transaction(tx) for tx in open_transactions])
-
-
 def add_transaction(amount, recipient, sender=owner):
 	"""Adds the transaction to the blockchain's open-transactions queue
 	if verified for sufficient balance.
@@ -239,7 +190,8 @@ def add_transaction(amount, recipient, sender=owner):
 	# transaction = OrderedDict([('sender', sender), ('recipient', recipient), ('amount', amount)])
 
 	transaction = Transaction(sender,recipient,amount)
-	if verify_transaction(transaction):
+	verifier = Verification()
+	if verifier.verify_transaction(transaction, get_balance):
 		open_transactions.append(transaction)
 		# participants.add(sender)
 		# participants.add(recipient)
@@ -309,7 +261,8 @@ while take_user_input:
 		print("\nBalance of {}: {:6.2f}".format(owner, get_balance(owner)))
 
 	elif user_choice == '6':
-		if verify_all_open_transactions():
+		verifier = Verification()
+		if verifier.verify_open_transactions(open_transactions, get_balance):
 			print("\nAll open transactions are valid.")
 		else:
 			print("\nSome open transactions are invalid!")
@@ -329,7 +282,8 @@ while take_user_input:
 	else:
 		print('Invalid choice!')
 
-	if not verify_chain():
+	verifier = Verification()
+	if not verifier.verify_chain(blockchain, POW_LEADING_ZEROS):
 		print('Invalid Blockchain!!')
 		take_user_input = False
 
