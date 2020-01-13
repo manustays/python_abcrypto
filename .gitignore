@@ -1,5 +1,5 @@
 # Project excludes
-blockchain.txt
+blockchain_store.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
