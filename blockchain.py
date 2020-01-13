@@ -1,5 +1,6 @@
 from functools import reduce
 from collections import OrderedDict
+import json
 
 from hash_util import hash_block, hash_str_256
 
@@ -28,6 +29,46 @@ owner = 'Abhi'
 # Set of all participants
 participants = {'Abhi'}
 
+
+
+def load_data():
+	"""Loads the blockchain and the open-transactions data from the file"""
+	with open('blockchain.txt', mode='r') as f:
+		file_content = f.readlines()
+		global blockchain
+		global open_transactions
+
+		blockchain = json.loads(file_content[0][:-1])	# Exclude '\n' at the end of the line
+		updated_blockchain = []
+		for block in blockchain:
+			updated_block = {
+				'previous_hash': block['previous_hash'],
+				'index': block['index'],
+				'transactions': [OrderedDict(
+			[('sender', tx['sender']), ('recipient', tx['recipient']), ('amount', tx['amount'])]) for tx in block['transactions']],
+				'proof': block['proof']
+			}
+			updated_blockchain.append(updated_block)
+		blockchain = updated_blockchain
+
+		open_transactions = json.loads(file_content[1])
+		updated_open_transactions = []
+		for tx in open_transactions:
+			updated_transaction = OrderedDict(
+			[('sender', tx['sender']), ('recipient', tx['recipient']), ('amount', tx['amount'])])
+			updated_open_transactions.append(updated_transaction)
+		open_transactions = updated_open_transactions
+
+
+load_data()		# Load Data as soon as the program starts
+
+
+def save_data():
+	"""Saves the blockchain and the open-transactions data into a file"""
+	with open('blockchain.txt', mode='w') as f:
+		f.write(json.dumps(blockchain))
+		f.write('\n')
+		f.write(json.dumps(open_transactions))
 
 
 def valid_proof(transaction, last_hash, proof):
@@ -95,6 +136,7 @@ def mine_block():
 		# Clear open-transactions. BUG: TODO: New transactions may have been added by now
 		open_transactions = []
 		print(f"Mining done. Proof = {proof}")
+		save_data()
 
 
 def verify_chain():
@@ -184,6 +226,7 @@ def add_transaction(amount, recipient, sender=owner):
 		open_transactions.append(transaction)
 		participants.add(sender)
 		participants.add(recipient)
+		save_data()
 		return True
 	else:
 		return False
