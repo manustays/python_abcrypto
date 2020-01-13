@@ -4,6 +4,7 @@ from collections import OrderedDict
 import pickle
 
 from hash_util import hash_block, hash_str_256
+from block import Block
 
 
 # Configure Reward received for a successful mining of a block
@@ -64,13 +65,14 @@ def load_data():
 	except (IOError, IndexError):
 		print('Blockchain save file not found!')
 		# Initializing blockchain list with Genesis (first) block
-		GENESIS_BLOCK = {
-			'previous_hash': '',		# Not required as it is the Genesis (first) block
-			'index': 0,
-			'transactions': [],
-			'proof': 0					# Dummy proof (not required)
-		}
-		blockchain = [GENESIS_BLOCK]
+		genesis_block = Block(0,'',[],0,0)
+		# {
+		# 	'previous_hash': '',		# Not required as it is the Genesis (first) block
+		# 	'index': 0,
+		# 	'transactions': [],
+		# 	'proof': 0					# Dummy proof (not required)
+		# }
+		blockchain = [genesis_block]
 		# Initialize open-transactions
 		open_transactions = []
 
@@ -106,7 +108,7 @@ def valid_proof(transaction, last_hash, proof):
 	Arguments:
 		:transaction: List of transactions in the block
 		:last_hash: Hash of last block stored in the current block
-		:proof: The Nounce number that is to be checked
+		:proof: The Nonce number that is to be checked
 	"""
 	guess = (str(transaction) + str(last_hash) + str(proof)).encode()	# Combine and UTF8 encode
 	guess_hash = hash_str_256(guess)
@@ -115,7 +117,7 @@ def valid_proof(transaction, last_hash, proof):
 
 
 def proof_of_work():
-	"""Generate and return a proof-of-work (nounce) for the given block
+	"""Generate and return a proof-of-work (nonce) for the given block
 
 	Arguments:
 		:block: The block for which proof-of-work is to be generated
@@ -152,12 +154,7 @@ def mine_block():
 		last_block = blockchain[-1]				# Get the last block to generate hash
 		hashed_block = hash_block(last_block)	# Get hash of the last block
 		proof = proof_of_work()		# Generate proof of work
-		block = {								# Create the new block
-			'previous_hash': hashed_block,
-			'index': len(blockchain),
-			'transactions': copied_open_transactions,
-			'proof': proof
-		}
+		block = Block(len(blockchain), hashed_block, copied_open_transactions, proof)	# Create the new block
 		# Add the new block to the blockchain
 		blockchain.append(block)
 		# Clear open-transactions. BUG: TODO: New transactions may have been added by now
@@ -172,12 +169,12 @@ def verify_chain():
 		if index == 0:
 			# Ignore the Genesis block.
 			continue
-		if block['previous_hash'] != hash_block(blockchain[index-1]):
+		if block.previous_hash != hash_block(blockchain[index-1]):
 			# Fail verification, if the previous-hash stored in the block does not match
 			# the actual hash of the previous block.
 			print(f"ERROR: The previous-hash in block {index} does not match the actual hash")
 			return False
-		if not valid_proof(block['transactions'][:-1], block['previous_hash'], block['proof']):
+		if not valid_proof(block.transactions[:-1], block.previous_hash, block.proof):
 			# Fail verification, if the proof-of-work is invalid,
 			# i.e, it does not generate the required hash from the stored proof.
 			# Ignore the last transaction in the transactions array, which is the mining reward
@@ -197,7 +194,7 @@ def get_balance(participant):
 	"""
 	# Fetch a list of all sent coin amounts for the given person (empty lists returned if the person was not the sender)
 	# This fetches sent amounts of transactions that were already mined (included in blockchain)
-	tx_sender = [[tx['amount'] for tx in block['transactions'] if tx['sender'] == participant] for block in blockchain]
+	tx_sender = [[tx['amount'] for tx in block.transactions if tx['sender'] == participant] for block in blockchain]
 	# Fetch a list of all sent coin amounts for the given person (empty lists returned if the person was not the sender)
 	# This fetches sent amounts of open-transactions (to avoid double spending)
 	open_tx_sender = [tx['amount'] for tx in open_transactions if tx['sender'] == participant]
@@ -207,7 +204,7 @@ def get_balance(participant):
 
 	# Fetch a list all received received coin amounts that were already mined in the blockchain
 	# Here we ignore open-transactions because the receipient has not yet actually received those coins yet
-	tx_recipient = [[tx['amount'] for tx in block['transactions'] if tx['recipient'] == participant] for block in blockchain]
+	tx_recipient = [[tx['amount'] for tx in block.transactions if tx['recipient'] == participant] for block in blockchain]
 	amount_received = reduce(lambda tx_sum, tx_amt: tx_sum + (sum(tx_amt) if len(tx_amt) > 0 else 0), tx_recipient, 0)
 
 	# print(f"Total Amount sent={amount_sent}, received={amount_received}")

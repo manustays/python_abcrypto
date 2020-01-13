@@ -8,6 +8,7 @@ def hash_str_256(str):
 	Arguments:
 		:str: The string to hash
 	"""
+	# Return string representation of SHA256 using hexdigest()
 	return hashlib.sha256(str).hexdigest()
 
 
@@ -15,9 +16,9 @@ def hash_block(block):
 	"""Returns the SHA256 hash of the block as a string
 
 	Arguments:
-		:block: The block to hash
+		:block: The block to hash. It's an object of class Block
 	"""
 	# Convert string to UTF8 with encode()
-	# Return string representation of SHA256 with hexdigest()
 	# The "sort_keys=True" ensures that order of data remains same during multiple hashing of same block
-	return hash_str_256(json.dumps(block, sort_keys=True).encode())
+	hashable_block = block.__dict__.copy()
+	return hash_str_256(json.dumps(hashable_block, sort_keys=True).encode())
