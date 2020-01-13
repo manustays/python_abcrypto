@@ -5,6 +5,7 @@ import pickle
 
 from hash_util import hash_block, hash_str_256
 from block import Block
+from transaction import Transaction
 
 
 # Configure Reward received for a successful mining of a block
@@ -24,7 +25,7 @@ open_transactions = []
 owner = 'Abhi'
 
 # Set of all participants
-participants = {'Abhi'}
+# participants = {'Abhi'}
 
 
 
@@ -100,17 +101,17 @@ def save_data():
 		print('Saving blockchain failed!')
 
 
-def valid_proof(transaction, last_hash, proof):
+def valid_proof(transactions, last_hash, proof):
 	"""Returns True, if the proof (nonce) is valid a proof-of-work,
 	i.e., if it satisfies the proof-of-work condition of generating
 	a hash with the pre-defined number of zeros.
 
 	Arguments:
-		:transaction: List of transactions in the block
+		:transactions: List of transactions of the block for which proof is required
 		:last_hash: Hash of last block stored in the current block
 		:proof: The Nonce number that is to be checked
 	"""
-	guess = (str(transaction) + str(last_hash) + str(proof)).encode()	# Combine and UTF8 encode
+	guess = (str([tx.to_ordered_dict() for tx in transactions]) + str(last_hash) + str(proof)).encode()	# Combine and UTF8 encode
 	guess_hash = hash_str_256(guess)
 	print("GUESS HASH: ", guess_hash)
 	return guess_hash[:POW_LEADING_ZEROS] == ('0' * POW_LEADING_ZEROS)
@@ -139,15 +140,10 @@ def mine_block():
 	if len(open_transactions) > 0:
 		print ('Mining started...')
 		# Add mining reward...
-		# reward_transaction = {
-		# 	'sender': 'MINING',
-		# 	'recipient': owner,
-		# 	'amount': MINING_REWARD
-		# }
 		# OrderedDict ensures that the order of data remains same
 		# so that the same hash is generated each time.
-		reward_transaction = OrderedDict(
-			[('sender', 'MINING'), ('recipient', owner), ('amount', MINING_REWARD)])
+		# reward_transaction = OrderedDict([('sender', 'MINING'), ('recipient', owner), ('amount', MINING_REWARD)])
+		reward_transaction = Transaction('MINING', owner, MINING_REWARD)
 		copied_open_transactions = open_transactions[:]
 		copied_open_transactions.append(reward_transaction)
 		# Mine the new block:
@@ -194,17 +190,17 @@ def get_balance(participant):
 	"""
 	# Fetch a list of all sent coin amounts for the given person (empty lists returned if the person was not the sender)
 	# This fetches sent amounts of transactions that were already mined (included in blockchain)
-	tx_sender = [[tx['amount'] for tx in block.transactions if tx['sender'] == participant] for block in blockchain]
+	tx_sender = [[tx.amount for tx in block.transactions if tx.sender == participant] for block in blockchain]
 	# Fetch a list of all sent coin amounts for the given person (empty lists returned if the person was not the sender)
 	# This fetches sent amounts of open-transactions (to avoid double spending)
-	open_tx_sender = [tx['amount'] for tx in open_transactions if tx['sender'] == participant]
+	open_tx_sender = [tx.amount for tx in open_transactions if tx.sender == participant]
 	tx_sender.append(open_tx_sender)	# Add open transaction amounts for sender (sent amount)
 	# Calculate total sent amount
 	amount_sent = reduce(lambda tx_sum, tx_amt: tx_sum + (sum(tx_amt) if len(tx_amt) > 0 else 0), tx_sender, 0)
 
 	# Fetch a list all received received coin amounts that were already mined in the blockchain
 	# Here we ignore open-transactions because the receipient has not yet actually received those coins yet
-	tx_recipient = [[tx['amount'] for tx in block.transactions if tx['recipient'] == participant] for block in blockchain]
+	tx_recipient = [[tx.amount for tx in block.transactions if tx.recipient == participant] for block in blockchain]
 	amount_received = reduce(lambda tx_sum, tx_amt: tx_sum + (sum(tx_amt) if len(tx_amt) > 0 else 0), tx_recipient, 0)
 
 	# print(f"Total Amount sent={amount_sent}, received={amount_received}")
@@ -217,10 +213,10 @@ def verify_transaction(transaction):
 	"""Returns True if the Sender of the transaction has sufficient balance for the transaction
 
 	Arguments:
-		:transaction: The transaction to verify
+		:transaction: The transaction to verify (object of class Transaction)
 	"""
-	sender_balance = get_balance(transaction['sender'])
-	return sender_balance >= transaction['amount']
+	sender_balance = get_balance(transaction.sender)
+	return sender_balance >= transaction.amount
 
 
 def verify_all_open_transactions():
@@ -238,18 +234,15 @@ def add_transaction(amount, recipient, sender=owner):
 		:recipient: The recipient of the coins
 		:amount: The amount of coins sent with the transaction
 	"""
-	# transaction = {
-	# 	'sender': sender,
-	# 	'recipient': recipient,
-	# 	'amount': amount
-	# }
 	# OrderedDict ensures that the order of data remains same
 	# so that the same hash is generated each time.
-	transaction = OrderedDict([('sender', sender), ('recipient', recipient), ('amount', amount)])
+	# transaction = OrderedDict([('sender', sender), ('recipient', recipient), ('amount', amount)])
+
+	transaction = Transaction(sender,recipient,amount)
 	if verify_transaction(transaction):
 		open_transactions.append(transaction)
-		participants.add(sender)
-		participants.add(recipient)
+		# participants.add(sender)
+		# participants.add(recipient)
 		save_data()
 		return True
 	else:
@@ -273,11 +266,12 @@ def get_user_choice():
 	"""Inputs a choice from the user"""
 	print()
 	print("-" * 20)
-	print("Please choose")
+	print("  SELECT AN OPTION")
+	print("-" * 20)
 	print("1. Add New Transaction")
 	print("2. Mine Blockchain")
 	print("3. View Blockchain")
-	print("4. View Participants")
+	# print("4. View Participants")
 	print("5. View My Balance")
 	print("6. Verify Open Transactions")
 	print("m. Manipulate Blockchain")
@@ -308,11 +302,11 @@ while take_user_input:
 	elif user_choice == '3':
 		print_blockchain_elements()
 
-	elif user_choice == '4':
-		print(participants)
+	# elif user_choice == '4':
+	# 	print(participants)
 
 	elif user_choice == '5':
-		print(get_balance(owner))
+		print("\nBalance of {}: {:6.2f}".format(owner, get_balance(owner)))
 
 	elif user_choice == '6':
 		if verify_all_open_transactions():

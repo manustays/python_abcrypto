@@ -10,6 +10,14 @@ class Block:
 		self.timestamp = time() if timestamp is None else timestamp
 
 
-	def __str__(self):
-		return str(self.__dict__)
+	def __repr__(self):
+		# return str(self.__dict__)
+		return '{{"index":{},"previous_hash":"{}","proof":{},"timestamp":{},"transactions":{}}}'.format(
+			self.index,
+			self.previous_hash,
+			self.proof,
+			self.timestamp,
+			self.transactions
+			# str([str(tx) for tx in self.transactions])
+		)
 
