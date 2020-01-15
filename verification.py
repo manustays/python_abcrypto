@@ -2,7 +2,8 @@ from hash_util import hash_block, hash_str_256
 
 class Verification:
 
-	def valid_proof(self, transactions, last_hash, proof, POW_LEADING_ZEROS):
+	@staticmethod
+	def valid_proof(transactions, last_hash, proof, POW_LEADING_ZEROS):
 		"""Returns True, if the proof (nonce) is valid a proof-of-work,
 		i.e., if it satisfies the proof-of-work condition of generating
 		a hash with the pre-defined number of zeros.
@@ -18,7 +19,8 @@ class Verification:
 		return guess_hash[:POW_LEADING_ZEROS] == ('0' * POW_LEADING_ZEROS)
 
 
-	def verify_chain(self, blockchain, POW_LEADING_ZEROS):
+	@classmethod
+	def verify_chain(cls, blockchain, POW_LEADING_ZEROS):
 		"""Verifies the blockchain and returns True if it is valid, False otherwise"""
 		for (index,block) in enumerate(blockchain):
 			if index == 0:
@@ -29,7 +31,7 @@ class Verification:
 				# the actual hash of the previous block.
 				print(f"ERROR: The previous-hash in block {index} does not match the actual hash")
 				return False
-			if not self.valid_proof(block.transactions[:-1], block.previous_hash, block.proof, POW_LEADING_ZEROS):
+			if not cls.valid_proof(block.transactions[:-1], block.previous_hash, block.proof, POW_LEADING_ZEROS):
 				# Fail verification, if the proof-of-work is invalid,
 				# i.e, it does not generate the required hash from the stored proof.
 				# Ignore the last transaction in the transactions array, which is the mining reward
@@ -39,16 +41,18 @@ class Verification:
 		return True
 
 
-	def verify_transaction(self, transaction, get_balance):
+	@staticmethod
+	def verify_transaction(transaction, get_balance):
 		"""Returns True if the Sender of the transaction has sufficient balance for the transaction
 
 		Arguments:
 			:transaction: The transaction to verify (object of class Transaction)
 		"""
-		sender_balance = get_balance(transaction.sender)
+		sender_balance = get_balance()
 		return sender_balance >= transaction.amount
 
 
-	def verify_open_transactions(self, open_transactions, get_balance):
+	@classmethod
+	def verify_open_transactions(cls, open_transactions, get_balance):
 		"""Verifies all open-transactions and returns True if all are valid, False otherwise"""
-		return all([self.verify_transaction(tx, get_balance) for tx in open_transactions])
+		return all([cls.verify_transaction(tx, get_balance) for tx in open_transactions])
