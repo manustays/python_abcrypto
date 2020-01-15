@@ -95,5 +95,7 @@ class Node:
 				take_user_input = False
 
 
-node = Node()
-node.command_line_interface()
+# Start UI on a command-line-interface only if this file was executed directly
+if __name__ == '__main__':
+	node = Node()
+	node.command_line_interface()

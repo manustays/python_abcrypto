@@ -1,3 +1,5 @@
+"""Provides helper methods to generate the hash of block in the blockchain."""
+
 import hashlib
 import json
 

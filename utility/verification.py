@@ -1,6 +1,10 @@
+"""Provides helper methods for verifications done in a blockchain"""
+
 from utility.hash_util import hash_block, hash_str_256
 
+
 class Verification:
+	"""A helper class to group the verious static & class-based verification methods"""
 
 	@staticmethod
 	def valid_proof(transactions, last_hash, proof, POW_LEADING_ZEROS):
@@ -21,7 +25,11 @@ class Verification:
 
 	@classmethod
 	def verify_chain(cls, blockchain, POW_LEADING_ZEROS):
-		"""Verifies the blockchain and returns True if it is valid, False otherwise"""
+		"""Verifies the blockchain and returns True if it is valid, False otherwise
+
+		Arguments:
+			:blockchain: The blockchain to verify
+		"""
 		for (index,block) in enumerate(blockchain):
 			if index == 0:
 				# Ignore the Genesis block.
@@ -47,6 +55,7 @@ class Verification:
 
 		Arguments:
 			:transaction: The transaction to verify (object of class Transaction)
+			:get_balance: Reference to the Blockchain class method to get the balance of the blockchain
 		"""
 		sender_balance = get_balance()
 		return sender_balance >= transaction.amount
