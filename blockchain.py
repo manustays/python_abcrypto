@@ -7,6 +7,7 @@ from block import Block
 from transaction import Transaction
 from utility.hash_util import hash_block
 from utility.verification import Verification
+from wallet import Wallet
 
 
 # Configure Reward received for a successful mining of a block
@@ -95,7 +96,7 @@ class Blockchain:
 		return amount_received - amount_sent
 
 
-	def add_transaction(self, amount, recipient, sender):	# sender=self.owner
+	def add_transaction(self, sender, recipient, amount, signature):	# sender=self.owner
 		"""Adds the transaction to the blockchain's open-transactions queue
 		if verified for sufficient balance.
 		Returns True if the transaction was added successfully, False otherwise.
@@ -104,13 +105,17 @@ class Blockchain:
 			:sender: The sender of the coins
 			:recipient: The recipient of the coins
 			:amount: The amount of coins sent with the transaction
+			:signature: The cryptographic signature of the transaction signed by sender's private-key
 		"""
-		transaction = Transaction(sender, recipient, amount)
+		if self.hosting_node == None:
+			return False
+		transaction = Transaction(sender, recipient, amount, signature)
 		if Verification.verify_transaction(transaction, self.get_balance):
 			self.__open_transactions.append(transaction)
 			self.save_data()
 			return True
 		else:
+			# TODO: If a transaction verification fails (due to signature), remove it from open_transactions
 			return False
 
 
@@ -131,15 +136,22 @@ class Blockchain:
 	def mine_block(self):
 		"""Mine a block of the blockchain by processing and including
 		all pending open-transactions into the blockchain"""
+		if self.hosting_node == None:
+			return False
 		# Mine a block if there are pending transactions in the open-transactions list
 		if len(self.__open_transactions) > 0:
-			print ('Mining started...')
+			# print ('Mining started...')
 			# Add mining reward...
 			# OrderedDict ensures that the order of data remains same
 			# so that the same hash is generated each time.
 			# reward_transaction = OrderedDict([('sender', 'MINING'), ('recipient', owner), ('amount', self.mining_reward)])
-			reward_transaction = Transaction('MINING', self.hosting_node, self.mining_reward)
+			reward_transaction = Transaction('MINING', self.hosting_node, self.mining_reward, '')
 			copied_open_transactions = self.__open_transactions[:]
+			# Verify open transactions
+			for tx in copied_open_transactions:
+				if not Wallet.verify_transaction_signature(tx):
+					return False
+			# Append mining reward to open transactions
 			copied_open_transactions.append(reward_transaction)
 			# Mine the new block:
 			last_block = self.__chain[-1]				# Get the last block to generate hash
@@ -150,5 +162,8 @@ class Blockchain:
 			self.__chain.append(block)
 			# Clear open-transactions. BUG: TODO: New transactions may have been added by now
 			self.__open_transactions = []
-			print(f"Mining done. Proof = {proof}")
+			# print(f"Mining done. Proof = {proof}")
 			self.save_data()
+			return proof
+		else:
+			return False

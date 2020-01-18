@@ -1,5 +1,6 @@
 # Project excludes
 blockchain_store.*
+wallet_store.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

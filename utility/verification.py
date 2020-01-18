@@ -1,7 +1,7 @@
 """Provides helper methods for verifications done in a blockchain"""
 
 from utility.hash_util import hash_block, hash_str_256
-
+from wallet import Wallet
 
 class Verification:
 	"""A helper class to group the verious static & class-based verification methods"""
@@ -50,18 +50,24 @@ class Verification:
 
 
 	@staticmethod
-	def verify_transaction(transaction, get_balance):
-		"""Returns True if the Sender of the transaction has sufficient balance for the transaction
+	def verify_transaction(transaction, get_balance, check_funds=True):
+		"""Returns True if the transaction is valid. I.e,
+		   (1) if the sender of the transaction has sufficient balance for the transaction, and
+		   (2) if the cryptographic signature of the transaction is valid
 
 		Arguments:
 			:transaction: The transaction to verify (object of class Transaction)
 			:get_balance: Reference to the Blockchain class method to get the balance of the blockchain
 		"""
-		sender_balance = get_balance()
-		return sender_balance >= transaction.amount
+		valid_signature = Wallet.verify_transaction_signature(transaction)
+		if check_funds:
+			sender_balance = get_balance()
+			return sender_balance >= transaction.amount and valid_signature
+		else:
+			return valid_signature
 
 
 	@classmethod
 	def verify_open_transactions(cls, open_transactions, get_balance):
 		"""Verifies all open-transactions and returns True if all are valid, False otherwise"""
-		return all([cls.verify_transaction(tx, get_balance) for tx in open_transactions])
+		return all([cls.verify_transaction(tx, get_balance, False) for tx in open_transactions])
