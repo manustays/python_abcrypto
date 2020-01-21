@@ -20,7 +20,6 @@ POW_LEADING_ZEROS = 2
 class Blockchain:
 
 	def __init__(self, hosting_node_id):
-
 		# Initializing the Blockchain with the genesis (first) block
 		genesis_block = Block(0,'',[],0,0)
 		self.__chain = [genesis_block]
@@ -38,10 +37,18 @@ class Blockchain:
 
 
 	def get_chain(self):
+		"""Returns a copy of the current blockchain"""
 		return self.__chain[:]
 
 
+	def get_chain_dict(self):
+		"""Returns a copy of the current blockchain as a pure dict"""
+		dict_chain = [block.to_dict() for block in self.get_chain()]
+		return dict_chain
+
+
 	def get_open_transactions(self):
+		"""Returns a copy of the open transactions"""
 		return self.__open_transactions[:]
 
 
@@ -74,6 +81,8 @@ class Blockchain:
 		It also considers the sent coins in the pending open-transactions
 		to avoid double speding.
 		"""
+		if self.hosting_node == None:
+			return None
 		participant = self.hosting_node
 		# Fetch a list of all sent coin amounts for the given person (empty lists returned if the person was not the sender)
 		# This fetches sent amounts of transactions that were already mined (included in blockchain)
@@ -137,7 +146,7 @@ class Blockchain:
 		"""Mine a block of the blockchain by processing and including
 		all pending open-transactions into the blockchain"""
 		if self.hosting_node == None:
-			return False
+			return None
 		# Mine a block if there are pending transactions in the open-transactions list
 		if len(self.__open_transactions) > 0:
 			# print ('Mining started...')
@@ -150,7 +159,7 @@ class Blockchain:
 			# Verify open transactions
 			for tx in copied_open_transactions:
 				if not Wallet.verify_transaction_signature(tx):
-					return False
+					return None
 			# Append mining reward to open transactions
 			copied_open_transactions.append(reward_transaction)
 			# Mine the new block:
@@ -164,6 +173,6 @@ class Blockchain:
 			self.__open_transactions = []
 			# print(f"Mining done. Proof = {proof}")
 			self.save_data()
-			return proof
+			return block
 		else:
-			return False
+			return None

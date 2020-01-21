@@ -21,6 +21,11 @@ class Transaction:
 		return f'{{"sender":"{self.sender}","recipient":"{self.recipient}","amount":"{self.amount}","signature":"{self.signature}"}}'
 
 
+	def to_dict(self):
+		"""Get a copy of the transaction as a dict"""
+		return self.__dict__.copy()
+
+
 	def to_ordered_dict(self):
 		"""Returns an OrderedDict representation of the current Transaction object (to get a consistant hash)"""
 		return OrderedDict([('sender', self.sender), ('receipient', self.recipient), ('amount', self.amount), ('signature',self.signature)])

@@ -21,3 +21,16 @@ class Block:
 			# str([str(tx) for tx in self.transactions])
 		)
 
+
+	def to_dict(self):
+		"""Returns a copy of the block in the dict format"""
+		block =  self.__dict__.copy()
+		block['transactions'] = [tx.to_dict() for tx in block['transactions']]
+		return block
+
+
+	def to_hashable_dict(self):
+		"""Returns a copy of the block as a dict with the transactions as OrderedDict"""
+		hashable_block = self.__dict__.copy()
+		hashable_block['transactions'] = [tx.to_ordered_dict() for tx in hashable_block['transactions']]
+
