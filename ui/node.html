@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>ABCrypto - A sample blockchain & cryptocurrency implementation</title>
+	<link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
+	<link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+	<style>
+		.list-group {
+			border:1px dotted #999;
+			border-radius:8px;
+			font-size:0.8em;
+		}
+
+		.list-group-item {
+			padding:0.5em;
+		}
+
+		.list-group-item:not(:first-child) {
+			border-top:1px dotted #999;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="app">
+
+		<v-app>
+
+			<v-app-bar app clipped-left short>
+				<v-toolbar-title>ABCrypto</v-toolbar-title>
+			</v-app-bar>
+
+			<v-content>
+				<v-container fluid>
+					<v-row>
+
+						<v-col cols="12" md="4">
+							<v-card class="mx-auto" min-width="350px" :loading="walletLoading || txLoading">
+								<v-card-title class="headline">Wallet</v-card-title>
+								<v-card-subtitle>Balance: {{ funds.toFixed(2) }}</v-card-subtitle>
+
+								<v-tabs v-model="wallet_view">
+									<v-tab key="my">My Wallet</v-tab>
+									<v-tab key="tx" v-if="wallet">Send Coins</v-tab>
+								</v-tabs>
+
+								<v-tabs-items v-model="wallet_view">
+
+									<v-tab-item key="my">
+										<v-card flat>
+
+											<br>
+
+											<v-container>
+
+												<v-text-field v-if="wallet" label="Public Key" :value="wallet.public_key" readonly outlined dense></v-text-field>
+
+												<v-text-field v-if="wallet" label="Private Key (DO NOT SHARE)" :value="wallet.private_key" error readonly disabled outlined dense>
+												</v-text-field>
+
+												<v-card-text v-if="!wallet">
+													No Wallet Loaded. Load wallet or create a new one.
+												</v-card-text>
+
+											</v-container>
+
+											<v-card-actions>
+												<v-btn large color="primary" @click="onLoadWallet">
+													Load
+													<v-icon right dark>mdi-cloud-download</v-icon>
+												</v-btn>
+												<v-btn large text>
+													Create New
+													<v-icon right dark>mdi-plus</v-icon>
+												</v-btn>
+											</v-card-actions>
+
+										</v-card>
+									</v-tab-item>
+
+									<v-tab-item key="tx">
+										<v-card flat v-if="wallet">
+
+											<v-form v-model="formtrxnvalid" ref="formtrxn">
+												<v-container>
+													<v-row>
+														<v-col cols="12" dense>
+															<v-text-field v-model="outgoingTx.recipient" label="Recipient Key" hint="Enter the public-key of the recipient" hide-details="auto" :rules="recipient_rules" required validate-on-blur clearable filled dense>
+															</v-text-field>
+														</v-col>
+														<v-col cols="12" dense>
+															<v-text-field v-model="outgoingTx.amount" label="Amount" hint="Fractions are possible (eg: 2.45)" type="number" hide-details="auto" :rules="amount_rules" required validate-on-blur filled dense>
+															</v-text-field>
+														</v-col>
+													</v-row>
+												</v-container>
+											</v-form>
+
+
+											<v-card-actions>
+												<v-btn large color="primary" :disabled="txLoading || outgoingTx.recipient.trim() === '' || outgoingTx.amount.trim() === ''" @click="onSendTx">
+													Send
+													<v-icon right dark>mdi-send</v-icon>
+												</v-btn>
+											</v-card-actions>
+
+										</v-card>
+									</v-tab-item>
+
+								</v-tabs-items>
+
+							</v-card>
+						</v-col>
+
+
+						<v-col cols="12" md="8" v-if="wallet">
+							<v-card class="mx-auto" min-width="350px" :loading="dataLoading">
+								<v-card-title class="headline">Blockchain</v-card-title>
+								<!-- <v-card-subtitle>Balance: {{ funds.toFixed(2) }}</v-card-subtitle> -->
+
+								<v-tabs v-model="blockchain_view">
+									<v-tab key="chain">Blockchain</v-tab>
+									<v-tab key="tx">Open Transactions</v-tab>
+								</v-tabs>
+
+								<v-tabs-items v-model="blockchain_view">
+
+									<v-tab-item key="chain">
+										<v-card flat>
+											<v-card-actions>
+												<v-btn color="primary" @click="onLoadBlockchain">
+													Load Blockchain
+													<v-icon right dark>mdi-refresh</v-icon>
+												</v-btn>
+												<v-btn color="green">
+													Mine Coins
+													<v-icon right dark>mdi-thumb-up</v-icon>
+												</v-btn>
+											</v-card-actions>
+
+											<v-timeline dense>
+												<v-timeline-item v-for="(data, index) in blockchain" v-bind:key="data.index">
+
+													<template v-slot:icon>
+																{{data.index}}
+														</template>
+
+													<v-card class="elevation-2" color="#385F73" outlined>
+
+														<v-card-text>
+															<strong>Mining Date:</strong> {{getFormattedDate(data.timestamp)}}
+															<br>
+															<strong>Previous Hash:</strong> {{data.previous_hash}}
+															<br>
+															<strong>Proof Of Work:</strong> {{data.proof}}
+															<br>
+
+															<div class="list-group">
+																<div v-for="trxn in data.transactions" class="list-group-item">
+																	<div><strong>Amount:</strong> {{ trxn.amount }}</div>
+																	<div><strong>Sender:</strong> {{ trxn.sender }}</div>
+																	<div><strong>Recipient:</strong> {{ trxn.recipient }}</div>
+																</div>
+															</div>
+														</v-card-text>
+													</v-card>
+												</v-timeline-item>
+											</v-timeline>
+
+										</v-card>
+									</v-tab-item>
+
+									<v-tab-item key="tx">
+										<v-card flat>
+
+											<v-card-actions>
+												<v-btn color="primary" @click="onLoadOpenTransactions">
+													Load Open Transactions
+													<v-icon right dark>mdi-refresh</v-icon>
+												</v-btn>
+											</v-card-actions>
+
+											<v-timeline dense>
+												<v-timeline-item v-for="(data, index) in openTransactions" v-bind:key="data.index">
+
+													<template v-slot:icon>
+														{{data.index}}
+													</template>
+
+													<v-card class="elevation-2" color="#385F73" outlined>
+														<v-card-text>
+															<!-- <strong>Mining Date:</strong> {{getFormattedDate(data.timestamp)}}
+															<br> -->
+															<strong>Amount:</strong> {{data.amount}}
+															<br>
+															<strong>Sender:</strong> {{data.sender}}
+															<br>
+															<strong>Recipient:</strong> {{data.recipient}}
+														</v-card-text>
+													</v-card>
+												</v-timeline-item>
+											</v-timeline>
+
+										</v-card>
+									</v-tab-item>
+
+								</v-tabs-items>
+
+							</v-card>
+						</v-col>
+
+
+					</v-row>
+
+				</v-container>
+			</v-content>
+
+			<v-snackbar v-model="open_success_snackbar" color="success" multi-line bottom>
+				{{ success }}
+				<v-btn text @click="open_success_snackbar = false">
+					Close
+				</v-btn>
+			</v-snackbar>
+
+			<v-snackbar v-model="open_error_snackbar" color="error" multi-line bottom>
+				{{ error }}
+				<v-btn text @click="open_error_snackbar = false">
+					Close
+				</v-btn>
+			</v-snackbar>
+
+		</v-app>
+
+	</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+	<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+	<script>
+		new Vue({
+			el: '#app',
+			vuetify: new Vuetify(),
+
+			data: {
+				blockchain: [],
+				openTransactions: [],
+				wallet: null,
+				blockchain_view: 'chain',
+				walletLoading: false,
+				txLoading: false,
+				dataLoading: false,
+				error: null,
+				success: null,
+				funds: 0,
+
+				outgoingTx: {
+					recipient: '',
+					amount: ''
+				},
+
+				recipient_rules: [
+					v => !!v || "Recipient's public-key is required",
+				],
+				amount_rules: [
+					v => !!v || "Amount is required",
+					v => (v && +v >= 0) || 'Amount cannot be negetive',
+				],
+
+				wallet_view: 'my',
+				open_success_snackbar: false,
+				open_error_snackbar: false,
+				formtrxnvalid: true,
+			},
+
+
+			methods: {
+
+				getFormattedDate: function(timestamp) {
+					var date = new Date(1304921325178.3193); // Date 2011-05-09T06:08:45.178Z
+					var year = date.getFullYear();
+					var month = ("0" + (date.getMonth() + 1)).slice(-2);
+					var day = ("0" + date.getDate()).slice(-2);
+					var hh = ("0" + date.getHours()).slice(-2);
+					var mm = ("0" + date.getMinutes()).slice(-2);
+					var ss = ("0" + date.getSeconds()).slice(-2);
+
+					return `${year}-${month}-${day} ${hh}:${mm}:${ss}`;
+				},
+
+				setBalance: function(strBalance) {
+					floatBalance = parseFloat(strBalance);
+					this.funds = isNaN(floatBalance) ? 0 : floatBalance;
+				},
+
+				onCreateWallet: function () {
+					// Send Http request to create a new wallet (and return keys)
+					this.walletLoading = true;
+					axios.post('/wallet')
+						.then((resp) => {
+							console.log("Wallet Created: ", resp.data);
+							this.error = null;
+							this.success = 'New wallet created! Public Key = ' + resp.data.public_key +
+								', Private Key = ' + resp.data.private_key;
+							this.funds = 0;
+							this.wallet = {
+								public_key: resp.data.public_key,
+								private_key: resp.data.private_key
+							};
+							this.open_success_snackbar = true;
+						})
+						.catch((err) => {
+							this.success = null;
+							this.error = err.response.data && err.response.data.message ?
+											err.response.data.message : 'Something went wrong.';
+							this.wallet = null;
+							this.open_error_snackbar = true;
+						})
+						.finally(() => {
+							this.walletLoading = false;
+						});
+				},
+
+				onLoadWallet: function () {
+					// Send Http request to load an existing wallet (from a file on the server)
+					this.walletLoading = true;
+					axios.get('/wallet')
+						.then((resp) => {
+							console.log("Wallet Loaded: ", resp.data);
+							this.error = null;
+							this.success = 'Wallet loaded!';
+							this.setBalance(resp.data.balance);
+							this.wallet = {
+								public_key: resp.data.public_key,
+								private_key: resp.data.private_key
+							};
+							this.open_success_snackbar = true;
+						})
+						.catch((err) => {
+							this.success = null;
+							this.error = err.response.data && err.response.data.message ?
+											err.response.data.message : 'Something went wrong.';
+							this.wallet = null;
+							this.open_error_snackbar = true;
+						})
+						.finally(() => {
+							this.walletLoading = false;
+						});
+				},
+
+				onSendTx: function () {
+					// post a new transaction
+
+					if (this.$refs.formtrxn.validate()) {
+						this.txLoading = true;
+						axios.post('/transaction', {
+								recipient: this.outgoingTx.recipient,
+								amount: +this.outgoingTx.amount
+							})
+							.then((resp) => {
+								console.log("Transaction added: ", resp.data);
+								this.error = null;
+								this.success = resp.data.message;
+								this.setBalance(resp.data.balance);
+								this.open_success_snackbar = true;
+							})
+							.catch((err) => {
+								this.success = null;
+								this.error = err.response.data && err.response.data.message ?
+									err.response.data.message : 'Something went wrong.';
+								this.open_error_snackbar = true;
+							})
+							.finally(() => {
+								this.txLoading = false;
+								this.$refs.formtrxn.reset();
+							});
+					}
+				},
+
+				onMine: function() {
+					// Mine a block with  open-transactions
+					this.walletLoading = true;
+					axios.post('/mine')
+						.then((resp) => {
+							console.log("Block Mined: ", resp.data);
+							this.error = null;
+							this.success = resp.data.message;
+							this.setBalance(resp.data.balance);
+							this.open_success_snackbar = true;
+						})
+						.catch((err) => {
+							this.success = null;
+							this.error = err.response.data && err.response.data.message ?
+								err.response.data.message : 'Something went wrong.';
+							this.open_error_snackbar = true;
+						})
+						.finally(() => {
+							this.walletLoading = false;
+						});
+				},
+
+				onLoadBlockchain: function() {
+					// Load blockchain data
+					this.dataLoading = true;
+					axios.get('/chain')
+						.then((resp) => {
+							console.log("Blockchain Fetched: ", resp.data);
+							this.blockchain = resp.data;
+							this.error = null;
+						})
+						.catch((err) => {
+							this.error = 'Something went wrong.';
+							this.success = null;
+							this.open_error_snackbar = true;
+						})
+						.finally(() => {
+							this.dataLoading = false;
+						});
+				},
+
+				onLoadOpenTransactions: function() {
+					// Load transaction data
+					this.dataLoading = true;
+					axios.get('/transactions')
+						.then((resp) => {
+							console.log("Open-Transactions Fetched: ", resp.data);
+							this.openTransactions = resp.data;
+							this.error = null;
+						})
+						.catch((err) => {
+							this.error = 'Something went wrong.';
+							this.success = null;
+							this.open_error_snackbar = true;
+						})
+						.finally(() => {
+							this.dataLoading = false;
+						});
+				},
+			},
+
+			created() {
+				this.$vuetify.theme.dark = true;
+			},
+		})
+	</script>
+</body>
+
+</html>

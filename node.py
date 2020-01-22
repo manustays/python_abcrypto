@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from wallet import Wallet
@@ -15,7 +15,7 @@ blockchain = Blockchain(wallet.public_key)
 
 @app.route('/', methods=['GET'])
 def get_ui():
-	return "Some UI..."
+	return send_from_directory('ui', 'node.html')
 
 
 @app.route('/transactions', methods=['GET'])
@@ -63,7 +63,6 @@ def add_transaction():
 		return jsonify(response), 500
 
 
-
 @app.route('/wallet', methods=['POST'])
 def create_keys():
 	wallet.create_keys()
@@ -72,7 +71,8 @@ def create_keys():
 		blockchain = Blockchain(wallet.public_key)
 		response = {
 			'public_key': wallet.public_key,
-			'private_key': wallet.private_key
+			'private_key': wallet.private_key,
+			'balance': blockchain.get_balance()
 		}
 		return jsonify(response), 201
 	else:
@@ -89,7 +89,8 @@ def load_keys():
 		blockchain = Blockchain(wallet.public_key)
 		response = {
 			'public_key': wallet.public_key,
-			'private_key': wallet.private_key
+			'private_key': wallet.private_key,
+			'balance': blockchain.get_balance()
 		}
 		return jsonify(response), 200
 	else:
