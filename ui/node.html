@@ -102,7 +102,7 @@
 
 
 											<v-card-actions>
-												<v-btn large color="primary" :disabled="txLoading || outgoingTx.recipient.trim() === '' || outgoingTx.amount.trim() === ''" @click="onSendTx">
+												<v-btn large color="primary" :disabled="txLoading || outgoingTx.recipient === '' || outgoingTx.amount === ''" @click="onSendTx">
 													Send
 													<v-icon right dark>mdi-send</v-icon>
 												</v-btn>
@@ -125,6 +125,7 @@
 								<v-tabs v-model="blockchain_view">
 									<v-tab key="chain">Blockchain</v-tab>
 									<v-tab key="tx">Open Transactions</v-tab>
+									<v-tab key="net">Network</v-tab>
 								</v-tabs>
 
 								<v-tabs-items v-model="blockchain_view">
@@ -136,7 +137,7 @@
 													Load Blockchain
 													<v-icon right dark>mdi-refresh</v-icon>
 												</v-btn>
-												<v-btn color="green">
+												<v-btn color="green" @click="onMine">
 													Mine Coins
 													<v-icon right dark>mdi-thumb-up</v-icon>
 												</v-btn>
@@ -208,6 +209,38 @@
 										</v-card>
 									</v-tab-item>
 
+
+									<v-tab-item key="net">
+										<v-card flat>
+											<v-container>
+												<v-row>
+													<v-col cols="12" dense>
+														<v-text-field v-model="newNodeUrl" label="Node URL" hint="localhost:5001" hide-details="auto" :rules="node_url_rules" append-icon="mdi-plus" @click:append="onAddPeerNode"
+															required validate-on-blur filled dense>
+														</v-text-field>
+													</v-col>
+												</v-row>
+											</v-container>
+
+											<!-- <hr> -->
+
+											<v-card-actions>
+												<v-btn color="primary" @click="onLoadPeerNodes">
+													Load Peer Nodes
+													<v-icon right dark>mdi-refresh</v-icon>
+												</v-btn>
+
+											</v-card-actions>
+
+											<div class="list-group">
+												<div v-for="node in peer_nodes" class="list-group-item" @click="onRemovePeerNode(node)">
+													{{ node }} (click to delete)
+												</div>
+											</div>
+
+										</v-card>
+									</v-tab-item>
+
 								</v-tabs-items>
 
 							</v-card>
@@ -269,11 +302,17 @@
 					v => !!v || "Amount is required",
 					v => (v && +v >= 0) || 'Amount cannot be negetive',
 				],
+				node_url_rules: [
+					v => !!v || "Node URL is required",
+				],
 
 				wallet_view: 'my',
 				open_success_snackbar: false,
 				open_error_snackbar: false,
 				formtrxnvalid: true,
+
+				newNodeUrl: '',
+				peer_nodes: [],
 			},
 
 
@@ -353,7 +392,7 @@
 
 				onSendTx: function () {
 					// post a new transaction
-
+					this.$refs.formtrxn.validate();	// BUG: Success validation not happening on first call
 					if (this.$refs.formtrxn.validate()) {
 						this.txLoading = true;
 						axios.post('/transaction', {
@@ -366,6 +405,11 @@
 								this.success = resp.data.message;
 								this.setBalance(resp.data.balance);
 								this.open_success_snackbar = true;
+
+								// Update open-transaction list
+								this.onLoadOpenTransactions();
+								// Switch to open-transaction list
+								this.blockchain_view = 'tx';
 							})
 							.catch((err) => {
 								this.success = null;
@@ -390,6 +434,9 @@
 							this.success = resp.data.message;
 							this.setBalance(resp.data.balance);
 							this.open_success_snackbar = true;
+
+							// Refresh Block List
+							this.onLoadBlockchain();
 						})
 						.catch((err) => {
 							this.success = null;
@@ -439,6 +486,55 @@
 							this.dataLoading = false;
 						});
 				},
+
+
+				onLoadPeerNodes: function () {
+					axios.get('/nodes')
+						.then(function (response) {
+							this.success = 'Fetched nodes successfully.';
+							this.error = null;
+							this.peer_nodes = response.data.peer_nodes;
+							this.open_success_snackbar = true;
+						})
+						.catch(function (error) {
+							this.success = null;
+							this.error = error.response.data.message;
+							this.open_error_snackbar = true;
+						});
+				},
+
+
+				onAddPeerNode: function() {
+					axios.post('/node', { node: this.newNodeUrl })
+						.then(function (response) {
+							this.success = 'Stored node successfully.';
+							this.error = null;
+							this.nodes = response.data.peer_nodes;
+							this.open_success_snackbar = true;
+						})
+						.catch(function (error) {
+							this.success = null;
+							this.error = error.response.data.message;
+							this.open_error_snackbar = true;
+						});
+				},
+
+
+				onRemovePeerNode: function (node_url) {
+					// Remove node as a peer node
+					axios.delete('/node/' + node_url)
+						.then(response => {
+							this.success = 'Deleted node successfully.';
+							this.error = null;
+							this.peer_nodes = response.data.peer_nodes;
+							this.open_success_snackbar = true;
+						})
+						.catch(error => {
+							this.success = null;
+							this.error = error.response.data.message;
+							this.open_error_snackbar = true;
+						});
+				}
 			},
 
 			created() {

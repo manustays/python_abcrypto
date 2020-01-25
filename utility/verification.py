@@ -61,7 +61,7 @@ class Verification:
 		"""
 		valid_signature = Wallet.verify_transaction_signature(transaction)
 		if check_funds:
-			sender_balance = get_balance()
+			sender_balance = get_balance(transaction.sender)
 			return sender_balance >= transaction.amount and valid_signature
 		else:
 			return valid_signature

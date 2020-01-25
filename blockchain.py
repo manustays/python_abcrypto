@@ -2,6 +2,7 @@ from functools import reduce
 # from collections import OrderedDict
 # import json
 import pickle
+import requests
 
 from block import Block
 from transaction import Transaction
@@ -23,7 +24,8 @@ class Blockchain:
 		# Initializing the Blockchain with the genesis (first) block
 		genesis_block = Block(0,'',[],0,0)
 		self.__chain = [genesis_block]
-		self.hosting_node = hosting_node_id
+		self.__hosting_node = hosting_node_id
+		self.__peer_nodes = set()
 
 		# List of new unhandled transactions that are waiting to be processed (mined)
 		# and included into the blockchain
@@ -47,6 +49,11 @@ class Blockchain:
 		return dict_chain
 
 
+	def get_last_block(self):
+		"""Returns a copy of the last block of the current blockchain"""
+		return self.__chain[:][-1]
+
+
 	def get_open_transactions(self):
 		"""Returns a copy of the open transactions"""
 		return self.__open_transactions[:]
@@ -59,6 +66,7 @@ class Blockchain:
 				file_content = pickle.loads(f.read())
 				self.__chain = file_content['blockchain']
 				self.__open_transactions = file_content['open_transactions']
+				self.__peer_nodes = file_content['peer_nodes']
 		except (IOError, IndexError):
 			print('Blockchain save file not found. Starting a new Blockchain!')
 
@@ -69,21 +77,29 @@ class Blockchain:
 			with open('blockchain_store.p', mode='wb') as f:
 				save_data = {
 					'blockchain': self.__chain,
-					'open_transactions': self.__open_transactions
+					'open_transactions': self.__open_transactions,
+					'peer_nodes': self.__peer_nodes
 				}
 				f.write(pickle.dumps(save_data))
 		except IOError:
 			print('Saving blockchain failed!')
 
 
-	def get_balance(self):
-		"""Calculate and return the balance of the current node.
+	def get_balance(self, sender=None):
+		"""Calculate and return the balance of the sender node (by default, the current node).
 		It also considers the sent coins in the pending open-transactions
 		to avoid double speding.
+
+		Arguments:
+			:sender: The node whose balance is to be calculated
 		"""
-		if self.hosting_node == None:
-			return None
-		participant = self.hosting_node
+		if sender == None:
+			if self.__hosting_node == None:
+				return None
+			participant = self.__hosting_node
+		else:
+			participant = sender
+
 		# Fetch a list of all sent coin amounts for the given person (empty lists returned if the person was not the sender)
 		# This fetches sent amounts of transactions that were already mined (included in blockchain)
 		tx_sender = [[tx.amount for tx in block.transactions if tx.sender == participant] for block in self.__chain]
@@ -105,7 +121,7 @@ class Blockchain:
 		return amount_received - amount_sent
 
 
-	def add_transaction(self, sender, recipient, amount, signature):	# sender=self.owner
+	def add_transaction(self, sender, recipient, amount, signature, is_receiving=False):
 		"""Adds the transaction to the blockchain's open-transactions queue
 		if verified for sufficient balance.
 		Returns True if the transaction was added successfully, False otherwise.
@@ -115,13 +131,24 @@ class Blockchain:
 			:recipient: The recipient of the coins
 			:amount: The amount of coins sent with the transaction
 			:signature: The cryptographic signature of the transaction signed by sender's private-key
+			:is_receiving: Is this new transaction being received from another node as a broadcast?
 		"""
-		if self.hosting_node == None:
-			return False
+		# if self.__hosting_node == None:
+		# 	return False
 		transaction = Transaction(sender, recipient, amount, signature)
 		if Verification.verify_transaction(transaction, self.get_balance):
 			self.__open_transactions.append(transaction)
 			self.save_data()
+
+			# Broadcast to all nodes...
+			# BUG: THIS WILL SLOW DOWN 'add_transaction' HTTPS requests because it will wait till all broadcasting is also done and may lead to timeout
+			# TODO: BROADCAST asynchronously AFTER adding transaction
+			if not is_receiving:
+				broadcasted = self.broadcast('broadcast-transaction', {'sender': sender, 'recipient': recipient, 'amount': amount, 'signature': signature })
+				if not broadcasted:
+					print('Transaction declined, needs resolving')
+					return False		# TODO: Resolve conflict
+
 			return True
 		else:
 			# TODO: If a transaction verification fails (due to signature), remove it from open_transactions
@@ -145,7 +172,7 @@ class Blockchain:
 	def mine_block(self):
 		"""Mine a block of the blockchain by processing and including
 		all pending open-transactions into the blockchain"""
-		if self.hosting_node == None:
+		if self.__hosting_node == None:
 			return None
 		# Mine a block if there are pending transactions in the open-transactions list
 		if len(self.__open_transactions) > 0:
@@ -154,7 +181,7 @@ class Blockchain:
 			# OrderedDict ensures that the order of data remains same
 			# so that the same hash is generated each time.
 			# reward_transaction = OrderedDict([('sender', 'MINING'), ('recipient', owner), ('amount', self.mining_reward)])
-			reward_transaction = Transaction('MINING', self.hosting_node, self.mining_reward, '')
+			reward_transaction = Transaction('MINING', self.__hosting_node, self.mining_reward, '')
 			copied_open_transactions = self.__open_transactions[:]
 			# Verify open transactions
 			for tx in copied_open_transactions:
@@ -173,6 +200,86 @@ class Blockchain:
 			self.__open_transactions = []
 			# print(f"Mining done. Proof = {proof}")
 			self.save_data()
+
+			# Broadcast to all nodes...
+			# BUG: THIS WILL SLOW DOWN 'mine_block' HTTPS requests because it will wait till all broadcasting is also done and may lead to timeout
+			# TODO: BROADCAST asynchronously AFTER mining
+			# if not is_receiving:
+			broadcasted = self.broadcast('broadcast-block', {'block': block.to_dict() })
+			if not broadcasted:
+				print('Block declined, needs resolving')
+				# return None	# TODO: Resolve conflict
+
 			return block
 		else:
 			return None
+
+
+	def add_block(self, block):
+		"""Validates and adds an already mined block that was broadcast by another node
+
+		Arguments:
+			:block: The block to add that was broadcast by another node
+		"""
+		transactions = [Transaction(tx.sender, tx.recipient, tx.amount, tx.signature) for tx in block['transactions']]
+		proof_is_valid = Verification.valid_proof(transactions[:-1], block['previous_hash'], block['proof'], self.mining_difficulty)
+		hashes_match = hash_block(self.__chain[-1]) == block['previous']
+		if not proof_is_valid or not hashes_match:
+			return False
+
+		block_object = Block(block['index'], block['previous_hash'], block['transactions'], block['proof'], block['timestamp'])
+		self.__chain.append(block_object)
+
+		# Update open-transactions: remove any transaction that is already mined...
+		stored_transactions = self.__open_transactions[:]
+		for itx in block['transactions']:		# incoming transactions
+			for otx in stored_transactions:		# open transactions
+				if otx.sender == itx['sender'] and otx.recipient == itx['recipient'] and otx.amount == itx['amount'] and otx.signature == itx['signature']:
+					try:
+						self.__open_transactions.remove(otx)
+					except ValueError:
+						pass
+
+		self.save_data()
+		return True
+
+
+
+	def get_peer_nodes(self):
+		"""Returns a list of connected peer nodes"""
+		return list(self.__peer_nodes)
+
+
+	def add_peer_node(self, node):
+		"""Adds a new node to the set of connected peer nodes
+
+		Arguments:
+			:node: The peer node URL to be added
+		"""
+		self.__peer_nodes.add(node)
+		self.save_data()
+
+
+	def remove_peer_node(self, node):
+		"""Removes a node from the set of connected peer nodes
+
+		Arguments:
+			:node: The peer node URL to be removed
+		"""
+		self.__peer_nodes.discard(node)
+		self.save_data()
+
+
+	def broadcast(self, endpoint, data):
+		"""Generic function for broadcasting data to all active nodes"""
+		for node in self.__peer_nodes:
+			url = 'http://{}/{}'.format(node, endpoint)
+			try:
+				response = requests.post(url, json=data)
+				if response.status_code >= 400:
+					# print('Transaction declined, needs resolving')
+					return False
+			except requests.exceptions.ConnectionError:
+				# Node is offline?
+				continue
+		return True
