@@ -233,8 +233,8 @@
 											</v-card-actions>
 
 											<div class="list-group">
-												<div v-for="node in peer_nodes" class="list-group-item" @click="onRemovePeerNode(node)">
-													{{ node }} (click to delete)
+												<div v-for="nodeurl in peer_nodes" class="list-group-item" @click="onRemovePeerNode(nodeurl)">
+													{{ nodeurl }} (click to delete)
 												</div>
 											</div>
 
@@ -489,39 +489,53 @@
 
 
 				onLoadPeerNodes: function () {
+					this.dataLoading = true;
+					console.log("BEFORE NODE LIST LOAD...");
+
 					axios.get('/nodes')
-						.then(function (response) {
+						.then(response => {
+							console.log("NODE LIST LOADED..", response.data);
+
 							this.success = 'Fetched nodes successfully.';
 							this.error = null;
 							this.peer_nodes = response.data.peer_nodes;
 							this.open_success_snackbar = true;
 						})
-						.catch(function (error) {
+						.catch(error => {
 							this.success = null;
 							this.error = error.response.data.message;
 							this.open_error_snackbar = true;
+						})
+						.finally(() => {
+							this.dataLoading = false;
 						});
 				},
 
 
 				onAddPeerNode: function() {
+					this.dataLoading = true;
 					axios.post('/node', { node: this.newNodeUrl })
-						.then(function (response) {
+						.then(response => {
 							this.success = 'Stored node successfully.';
 							this.error = null;
-							this.nodes = response.data.peer_nodes;
+							this.peer_nodes = response.data.peer_nodes;
 							this.open_success_snackbar = true;
+							this.newNodeUrl = '';
 						})
-						.catch(function (error) {
+						.catch(error => {
 							this.success = null;
 							this.error = error.response.data.message;
 							this.open_error_snackbar = true;
+						})
+						.finally(() => {
+							this.dataLoading = false;
 						});
 				},
 
 
 				onRemovePeerNode: function (node_url) {
 					// Remove node as a peer node
+					this.dataLoading = true;
 					axios.delete('/node/' + node_url)
 						.then(response => {
 							this.success = 'Deleted node successfully.';
@@ -533,6 +547,9 @@
 							this.success = null;
 							this.error = error.response.data.message;
 							this.open_error_snackbar = true;
+						})
+						.finally(() => {
+							this.dataLoading = false;
 						});
 				}
 			},
