@@ -15,7 +15,7 @@ from wallet import Wallet
 MINING_REWARD = 10
 
 # Configure Proof-Of-Work Difficulty: Number of leading zeros required in the hash
-POW_LEADING_ZEROS = 2
+POW_LEADING_ZEROS = 3
 
 
 class Blockchain:
@@ -26,6 +26,7 @@ class Blockchain:
 		self.__chain = [genesis_block]
 		self.__hosting_node = hosting_node_id
 		self.__peer_nodes = set()
+		self.resolve_conflicts = False			# Set to True, when there is a conflict to be resolved
 
 		# List of new unhandled transactions that are waiting to be processed (mined)
 		# and included into the blockchain
@@ -47,6 +48,11 @@ class Blockchain:
 		"""Returns a copy of the current blockchain as a pure dict"""
 		dict_chain = [block.to_dict() for block in self.get_chain()]
 		return dict_chain
+
+
+	def get_length(self):
+		"""Returns the length of the current blockchain"""
+		return len(self.__chain)
 
 
 	def get_last_block(self):
@@ -221,14 +227,13 @@ class Blockchain:
 		Arguments:
 			:block: The block to add that was broadcast by another node
 		"""
-		transactions = [Transaction(tx.sender, tx.recipient, tx.amount, tx.signature) for tx in block['transactions']]
+		transactions = [Transaction.from_dict(tx) for tx in block['transactions']]
 		proof_is_valid = Verification.valid_proof(transactions[:-1], block['previous_hash'], block['proof'], self.mining_difficulty)
 		hashes_match = hash_block(self.__chain[-1]) == block['previous']
 		if not proof_is_valid or not hashes_match:
 			return False
 
-		block_object = Block(block['index'], block['previous_hash'], block['transactions'], block['proof'], block['timestamp'])
-		self.__chain.append(block_object)
+		self.__chain.append(Block.from_dict(block))
 
 		# Update open-transactions: remove any transaction that is already mined...
 		stored_transactions = self.__open_transactions[:]
@@ -243,6 +248,30 @@ class Blockchain:
 		self.save_data()
 		return True
 
+
+	def resolve(self):
+		"""Resolves any conflict in the current blockchain"""
+		winner_chain = self.__chain
+		replace = False
+		for node in self.__peer_nodes:
+			url = 'http://{}/chain'.format(node)
+			try:
+				response = requests.get(url)
+				node_chain = response.json()
+				node_chain = [Block.from_dict(block) for block in node_chain]
+				node_chain_length = len(node_chain)
+				local_chain_length = len(self.__chain)
+				if node_chain_length > local_chain_length and Verification.verify_chain(node_chain, self.mining_difficulty):
+					winner_chain = node_chain
+					replace = True
+			except requests.exceptions.ConnectionError:
+				continue
+		self.resolve_conflicts = False
+		if replace:
+			self.__chain = winner_chain
+			self.__open_transactions = []		# Invalidate any previously open transactions
+			self.save_data()
+		return replace
 
 
 	def get_peer_nodes(self):
@@ -276,10 +305,14 @@ class Blockchain:
 			url = 'http://{}/{}'.format(node, endpoint)
 			try:
 				response = requests.post(url, json=data)
-				if response.status_code >= 400:
-					# print('Transaction declined, needs resolving')
+				if response.status_code == 409:
+					self.resolve_conflicts = True
+					return False
+				elif response.status_code >= 400:
+					# TODO: print('Transaction declined, needs resolving')
 					return False
 			except requests.exceptions.ConnectionError:
 				# Node is offline?
 				continue
 		return True
+

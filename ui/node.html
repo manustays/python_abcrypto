@@ -134,12 +134,16 @@
 										<v-card flat>
 											<v-card-actions>
 												<v-btn color="primary" @click="onLoadBlockchain">
-													Load Blockchain
+													Refresh
 													<v-icon right dark>mdi-refresh</v-icon>
 												</v-btn>
 												<v-btn color="green" @click="onMine">
 													Mine Coins
 													<v-icon right dark>mdi-thumb-up</v-icon>
+												</v-btn>
+												<v-btn color="warning" @click="onResolve">
+													Resolve Conflict
+													<v-icon right dark>mdi-shuffle</v-icon>
 												</v-btn>
 											</v-card-actions>
 
@@ -180,7 +184,7 @@
 
 											<v-card-actions>
 												<v-btn color="primary" @click="onLoadOpenTransactions">
-													Load Open Transactions
+													Refresh
 													<v-icon right dark>mdi-refresh</v-icon>
 												</v-btn>
 											</v-card-actions>
@@ -377,6 +381,7 @@
 								private_key: resp.data.private_key
 							};
 							this.open_success_snackbar = true;
+							this.initLists();	// Refresh other lists...
 						})
 						.catch((err) => {
 							this.success = null;
@@ -426,7 +431,7 @@
 
 				onMine: function() {
 					// Mine a block with  open-transactions
-					this.walletLoading = true;
+					this.dataLoading = true;
 					axios.post('/mine')
 						.then((resp) => {
 							console.log("Block Mined: ", resp.data);
@@ -445,7 +450,31 @@
 							this.open_error_snackbar = true;
 						})
 						.finally(() => {
-							this.walletLoading = false;
+							this.dataLoading = false;
+						});
+				},
+
+				onResolve: function() {
+					// Resolve conflict in current blockchain
+					this.dataLoading = true;
+					axios.post('/resolve-conflicts')
+						.then((resp) => {
+							console.log("Conflict resolved: ", resp.data);
+							this.error = null;
+							this.success = resp.data.message;
+							this.open_success_snackbar = true;
+
+							// Refresh All List
+							this.initLists();
+						})
+						.catch((err) => {
+							this.success = null;
+							this.error = err.response.data && err.response.data.message ?
+								err.response.data.message : 'Something went wrong.';
+							this.open_error_snackbar = true;
+						})
+						.finally(() => {
+							this.dataLoading = false;
 						});
 				},
 
@@ -551,11 +580,20 @@
 						.finally(() => {
 							this.dataLoading = false;
 						});
-				}
+				},
+
+
+				initLists: function() {
+					this.onLoadBlockchain();
+					this.onLoadOpenTransactions();
+					this.onLoadPeerNodes();
+				},
 			},
+
 
 			created() {
 				this.$vuetify.theme.dark = true;
+				this.onLoadWallet();
 			},
 		})
 	</script>

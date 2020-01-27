@@ -76,7 +76,7 @@ class Node:
 				print("\nMining started...")
 				block = self.blockchain.mine_block()
 				if block != None:
-					print("Mining done! Proof={}, Balance={:.2f}".format(block['proof'], self.blockchain.get_balance()))
+					print("Mining done! Proof={}, Balance={:.2f}".format(block.proof, self.blockchain.get_balance()))
 					print("Added Block: ", block)
 				else:
 					print("Mining failed!")
