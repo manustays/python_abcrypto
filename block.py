@@ -1,5 +1,7 @@
 from time import time
 
+from transaction import Transaction
+
 class Block:
 
 	def __init__(self, index, previous_hash, transactions, proof, timestamp=None):
@@ -20,6 +22,20 @@ class Block:
 			self.transactions
 			# str([str(tx) for tx in self.transactions])
 		)
+
+
+	@classmethod
+	def from_dict(cls, block):
+		"""Factory function to return a Block object from a block dictionary
+
+		Arguments:
+			:block: A block dictionary to convert into object
+		"""
+		return cls(block['index'],
+			block['previous_hash'],
+			[Transaction.from_dict(tx) for tx in block['transactions']],
+			block['proof'],
+			block['timestamp'])
 
 
 	def to_dict(self):

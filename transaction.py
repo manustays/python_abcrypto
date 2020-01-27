@@ -21,6 +21,16 @@ class Transaction:
 		return f'{{"sender":"{self.sender}","recipient":"{self.recipient}","amount":"{self.amount}","signature":"{self.signature}"}}'
 
 
+	@classmethod
+	def from_dict(cls, transaction):
+		"""Factory function to return a Transaction object from a dictionary of transaction data
+
+		Arguments:
+			:transaction: A transaction dictionary to convert into object
+		"""
+		return cls(transaction.sender, transaction.recipient, transaction.amount, transaction.signature)
+
+
 	def to_dict(self):
 		"""Get a copy of the transaction as a dict"""
 		return self.__dict__.copy()
