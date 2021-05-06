@@ -7,7 +7,7 @@ Click==7.0
 colorama==0.4.3
 cryptography==2.8
 Flask==1.1.1
-Flask-Cors==3.0.8
+Flask-Cors==3.0.9
 idna==2.8
 isort==4.3.21
 itsdangerous==1.1.0
